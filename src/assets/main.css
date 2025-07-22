@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MODIFIED: Added global styles for form elements */
+@layer base {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"] {
+    @apply w-full border border-gray-300 rounded-md shadow-sm placeholder-gray-400 bg-white;
+    @apply focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+    @apply transition duration-150 ease-in-out;
+  }
+
+  select {
+    @apply pr-10 px-2 py-1 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 bg-white;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+}
