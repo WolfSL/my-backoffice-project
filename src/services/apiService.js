@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5202/api';
+const API_BASE_URL = window.config?.API_BASE_URL || 'http://localhost:5202/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -142,6 +142,52 @@ export default {
   manageBom(payload) {
     const { type, recipeItemCode, locationCode, itemcode, recDesc, qty, cost, plevel } = payload;
     return apiClient.get(`/Item/saveBom?type=${type}&recipeItemCode=${recipeItemCode}&locationCode=${locationCode}&itemcode=${itemcode}&recDesc=${recDesc}&qty=${qty}&cost=${cost}&plevel=${plevel}`);
-  }
+  },
+  //Reports
+  getItemWiseSales(dateFrom, dateTo, locations) {
+    // The type=8 seems constant for this report based on your example
+    //print locations on colsole
+    console.log("Locations for Item Wise Sales Report:", locations);
+    return apiClient.get(`/Report/getQB?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}&type=8`);
+  },
+
+  getSalesSummaryWithPayment(dateFrom, dateTo, locations) {
+    return apiClient.get(`/Report/getSalesSummeryWithPayment?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}`);
+  },
+
+  //Transactions
+  //PO
+  getMin(type, role, dis, q3, q4) {
+    return apiClient.get(`/Grn/getMin?type=${type}&role=${role}&dis=${dis}&q3=${q3}&q4=${q4}`);
+  },
+  getSupDetails(loc, sup) {
+    console.log(API_BASE_URL + `/Grn/getSupDetails?loc=${loc}&sup=${sup}`);
+    return apiClient.get(`/Grn/getSupDetails?loc=${loc}&sup=${sup}`);
+  },
+  updateSupAgentDetails(loc, sup, agentName, agentEmail) {
+    console.log(API_BASE_URL + `/Grn/updateSupAgentDetails?loc=${loc}&sup=${sup}&agentName=${agentName}&agentEmail=${agentEmail}`);
+    return apiClient.get(`/Grn/updateSupAgentDetails?loc=${loc}&sup=${sup}&agentName=${agentName}&agentEmail=${agentEmail}`);
+  },
+  reservePoNumber(username, discode, docType) {
+    return apiClient.get(`/Grn/reserv?username=${username}&discode=${discode}&docType=${docType}`);
+  },
+  savePO(payload,username) {
+    console.log(API_BASE_URL + `/Grn/save?username=${username}`);
+    //log payload before making the request
+    console.log("Payload for savePO:", payload);
+    return apiClient.post(`/Grn/save?username=${username}`, payload);
+  },
+  getEtdx(docNo, disCode, docType) {
+    //log url before making the request
+    console.log(API_BASE_URL + `/Grn/getEtdx?docNo=${docNo}&disCode=${disCode}&docType=${docType}`);
+    return apiClient.get(`/Grn/getEtdx?docNo=${docNo}&disCode=${disCode}&docType=${docType}`);
+  },
+  emailPurchaseOrder(formData) {
+    return apiClient.post('/Grn/uploadFile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
 
 };

@@ -134,14 +134,18 @@ export const useMastersStore = defineStore('masters', () => {
             priceLevels.value = [];
         }
     }
-    async function fetchItemPrices(itemCode, locationCodes = 'X') {
+    async function fetchItemPrices(itemCode, locationCodes = 'X', type = "S") {
         try {
             const response = await apiService.getItemPrices(itemCode, locationCodes);
+            if (type === 'R') {
+                console.log('Raw item prices:', response.data);
+                return response.data;
+            }
             currentItemPrices.value = response.data.map(price => ({
                 locationName: price.Locn_name,
                 priceLevelName: price.PriceLevel,
                 selling: price.selling,
-                mSelling: price['m.selling'],
+                mSelling: price.mSelling,
                 locationCode: locations.value.find(l => l.locName === price.Locn_name)?.locCode || '',
                 priceLevelCode: priceLevels.value.find(pl => pl.PriceLevel === price.PriceLevel)?.PricelevelCode || '',
                 GroupCode: price.GroupCode,
@@ -273,65 +277,69 @@ export const useMastersStore = defineStore('masters', () => {
 
     //BOM Actions
     async function fetchItemsForTransactions(search, location) {
-    if (!search || search.length < 2) {
-      transactionItems.value = [];
-      return;
+        if (!search || search.length < 2) {
+            transactionItems.value = [];
+            return;
+        }
+        try {
+            const response = await apiService.getItemsForTransactions(search, location);
+            transactionItems.value = response.data;
+        } catch (err) {
+            console.error('Failed to fetch transaction items:', err);
+            transactionItems.value = [];
+        }
     }
-    try {
-      const response = await apiService.getItemsForTransactions(search, location);
-      transactionItems.value = response.data;
-    } catch (err) {
-      console.error('Failed to fetch transaction items:', err);
-      transactionItems.value = [];
-    }
-  }
 
-  // MODIFIED: Updated to handle new response and normalize data
-  async function fetchItemBOM(itemCode, locationCode, plevel) {
-    try {
-      const response = await apiService.getItemBOM(itemCode, locationCode, plevel);
-      currentItemBOM.value = response.data.map(bom => ({
-        itemCode: bom.ItemCode,
-        itemDescription: bom.RecDesc,
-        quantity: bom.Qty,
-        totalCost: bom.TotValue,
-        unitpack: bom.Unitpack,
-        uom: bom.UOM,
-        locationCode: bom.locationCode,
-        priceLevelCode: bom.PLevel
-      }));
-    } catch (err) {
-      console.error('Failed to fetch item BOM:', err);
-      currentItemBOM.value = [];
+    // MODIFIED: Updated to handle new response and normalize data
+    async function fetchItemBOM(itemCode, locationCode, plevel, type = "S") {
+        try {
+            const response = await apiService.getItemBOM(itemCode, locationCode, plevel);
+            if (type === 'R') {
+                console.log('Raw item BOM:', response.data);
+                return response.data;
+            }
+            currentItemBOM.value = response.data.map(bom => ({
+                itemCode: bom.ItemCode,
+                itemDescription: bom.RecDesc,
+                quantity: bom.Qty,
+                totalCost: bom.TotValue,
+                unitpack: bom.Unitpack,
+                uom: bom.UOM,
+                locationCode: bom.locationCode,
+                priceLevelCode: bom.PLevel
+            }));
+        } catch (err) {
+            console.error('Failed to fetch item BOM:', err);
+            currentItemBOM.value = [];
+        }
     }
-  }
 
-  async function saveBomComponent(payload) {
-    try {
-      const response = await apiService.manageBom({ ...payload, type: 'S' });
-      setSuccessMessage(response.data.message || 'BOM component saved.');
-      await fetchItemBOM(payload.recipeItemCode, payload.locationCode, payload.plevel);
-    } catch (err) {
-      setOperationError('Failed to save BOM component.');
-      console.error(err);
+    async function saveBomComponent(payload) {
+        try {
+            const response = await apiService.manageBom({ ...payload, type: 'S' });
+            setSuccessMessage(response.data.message || 'BOM component saved.');
+            await fetchItemBOM(payload.recipeItemCode, payload.locationCode, payload.plevel);
+        } catch (err) {
+            setOperationError('Failed to save BOM component.');
+            console.error(err);
+        }
     }
-  }
 
-  async function deleteBomComponent(payload) {
-    try {
-      const response = await apiService.manageBom({ ...payload, type: 'D' });
-      setSuccessMessage(response.data.message || 'BOM component deleted.');
-      await fetchItemBOM(payload.recipeItemCode, payload.locationCode, payload.plevel);
-    } catch (err) {
-      setOperationError('Failed to delete BOM component.');
-      console.error(err);
+    async function deleteBomComponent(payload) {
+        try {
+            const response = await apiService.manageBom({ ...payload, type: 'D' });
+            setSuccessMessage(response.data.message || 'BOM component deleted.');
+            await fetchItemBOM(payload.recipeItemCode, payload.locationCode, payload.plevel);
+        } catch (err) {
+            setOperationError('Failed to delete BOM component.');
+            console.error(err);
+        }
     }
-  }
 
-  // MODIFIED: New getter for total BOM cost
-  const totalBomCost = computed(() => {
-    return currentItemBOM.value.reduce((total, item) => total + item.totalCost, 0);
-  });
+    // MODIFIED: New getter for total BOM cost
+    const totalBomCost = computed(() => {
+        return currentItemBOM.value.reduce((total, item) => total + (item.totalCost || 0), 0);
+    });
     return {
         suppliers, departments, subDepartments, items, units, printTypes, pluTypes, locations, priceLevels, currentItemPrices,
         transactionItems, currentItemBOM,
@@ -340,7 +348,7 @@ export const useMastersStore = defineStore('masters', () => {
         fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
         fetchDepartments, addDepartment, updateDepartment, deleteDepartment,
         fetchSubDepartments, addSubDepartment, updateSubDepartment, deleteSubDepartment,
-        fetchItems, addItem, fetchUnits, fetchPrintTypes, fetchPluTypes, fetchItemDetails, 
+        fetchItems, addItem, fetchUnits, fetchPrintTypes, fetchPluTypes, fetchItemDetails,
         updateItem, deleteItem, fetchLocations, fetchPriceLevels, fetchItemPrices, saveItemPrices,
         fetchItemsForTransactions, fetchItemBOM, saveBomComponent, deleteBomComponent
     };

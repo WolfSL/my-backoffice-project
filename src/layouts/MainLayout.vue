@@ -21,6 +21,18 @@
           <span class="mx-3 transition-opacity duration-300 whitespace-nowrap" :class="isSidebarExpanded ? 'opacity-100' : 'opacity-0'">Dashboard</span>
         </router-link>
         <div>
+          <button @click="isTransactionsOpen = !isTransactionsOpen" class="w-full flex items-center justify-between px-6 py-3 text-gray-100 hover:bg-black/40">
+            <div class="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h4M8 7a2 2 0 012-2h4a2 2 0 012 2v8a2 2 0 01-2 2h-4a2 2 0 01-2-2z" /></svg>
+              <span class="mx-3 transition-opacity duration-300 whitespace-nowrap" :class="isSidebarExpanded ? 'opacity-100' : 'opacity-0'">Transactions</span>
+            </div>
+            <svg v-if="isSidebarExpanded" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transition-transform duration-300" :class="isTransactionsOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          <div v-if="isTransactionsOpen && isSidebarExpanded" class="bg-black/20">
+            <router-link to="/transactions/purchase-orders" class="flex items-center py-3 pl-14 pr-6 text-gray-300 hover:bg-black/40 hover:text-white"><span>Purchase Order</span></router-link>
+          </div>
+        </div>
+        <div>
           <button @click="isMastersOpen = !isMastersOpen" class="w-full flex items-center justify-between px-6 py-3 text-gray-100 hover:bg-black/40">
             <div class="flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 0 0 0M12 21v-8M20 7s0 0 0 0" /></svg>
@@ -32,10 +44,15 @@
             <router-link to="/masters/suppliers" class="flex items-center py-3 pl-14 pr-6 text-gray-300 hover:bg-black/40 hover:text-white"><span>Suppliers</span></router-link>
             <router-link to="/masters/departments" class="flex items-center py-3 pl-14 pr-6 text-gray-300 hover:bg-black/40 hover:text-white"><span>Departments</span></router-link>
             <router-link to="/masters/sub-departments" class="flex items-center py-3 pl-14 pr-6 text-gray-300 hover:bg-black/40 hover:text-white"><span>Sub-Departments</span></router-link>
-            <!-- MODIFIED: Added new link for items -->
             <router-link to="/masters/items" class="flex items-center py-3 pl-14 pr-6 text-gray-300 hover:bg-black/40 hover:text-white"><span>Items</span></router-link>
           </div>
         </div>
+
+        
+        <router-link to="/reports" class="flex items-center px-6 py-3 text-gray-100 hover:bg-black/40">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          <span class="mx-3 transition-opacity duration-300 whitespace-nowrap" :class="isSidebarExpanded ? 'opacity-100' : 'opacity-0'">Reports</span>
+        </router-link>
       </nav>
       <div class="px-6 py-4 flex-shrink-0">
          <div class="text-center text-xs text-gray-500 mt-4 transition-opacity duration-300 whitespace-nowrap" :class="isSidebarExpanded ? 'opacity-100' : 'opacity-0'">
@@ -50,17 +67,34 @@
           <button @click="isSidebarOpen = !isSidebarOpen" class="text-gray-500 dark:text-gray-400 focus:outline-none md:hidden">
             <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
           </button>
-          <div class="relative hidden md:block ml-4">
-            <span class="absolute inset-y-0 left-0 pl-3 flex items-center"><svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg></span>
-            <input class="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-slate-600 placeholder-gray-400 focus:outline-none focus:ring-indigo-500" type="text" placeholder="Search pages...">
+          <div class="relative hidden md:block ml-2">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+            </span>
+            <input v-model="searchQuery" @focus="showSearchResults = true" class="w-full pl-10 pr-4 py-2 border rounded-md text-sm bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-slate-600 placeholder-gray-400 focus:outline-none focus:ring-indigo-500" type="text" placeholder="Search pages...">
+            <div v-if="showSearchResults && searchResults.length > 0" class="absolute mt-2 w-full bg-white dark:bg-slate-700 rounded-md shadow-lg z-20">
+              <ul>
+                <li v-for="route in searchResults" :key="route.name" @click="navigateTo(route.name)" class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600 cursor-pointer">
+                  {{ route.meta.title }}
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
         <div class="flex items-center">
-          <button @click="themeStore.toggleTheme" class="relative p-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none">
-            <svg v-if="themeStore.theme === 'light'" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-            <svg v-else class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+          <button @click="themeStore.toggleTheme" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none" :class="themeStore.theme === 'dark' ? 'bg-indigo-600' : 'bg-gray-200'">
+            <span class="sr-only">Toggle Theme</span>
+            <span class="inline-flex items-center justify-center w-4 h-4 transform bg-white rounded-full transition-transform" :class="themeStore.theme === 'dark' ? 'translate-x-6' : 'translate-x-1'">
+              <svg v-if="themeStore.theme === 'dark'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 14.464A1 1 0 106.465 13.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm-1.414-2.12a1 1 0 010-1.414l.707-.707a1 1 0 111.414 1.414l-.707.707a1 1 0 01-1.414 0zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+              </svg>
+            </span>
           </button>
-          <div class="relative ml-2">
+
+          <div class="relative ml-4">
             <button @click="isNotificationsOpen = !isNotificationsOpen" class="relative p-2 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 focus:outline-none">
               <svg class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-1.707 1.707A1 1 0 003 15h14a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" /></svg>
               <span v-if="dashboardStore.notificationCount > 0" class="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full transform translate-x-1/4 -translate-y-1/4">{{ dashboardStore.notificationCount }}</span>
@@ -88,7 +122,7 @@
         </div>
       </header>
       
-      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-slate-900 p-6">
+      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-slate-900 p-4">
         <slot></slot>
       </main>
     </div>
@@ -96,7 +130,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useDashboardStore } from '@/stores/dashboard';
 import { useThemeStore } from '@/stores/theme';
@@ -104,12 +139,38 @@ import { useThemeStore } from '@/stores/theme';
 const authStore = useAuthStore();
 const dashboardStore = useDashboardStore();
 const themeStore = useThemeStore();
+const router = useRouter();
 
 const isSidebarOpen = ref(false);
 const isSidebarExpanded = ref(false);
 const isUserMenuOpen = ref(false);
 const isNotificationsOpen = ref(false);
 const isMastersOpen = ref(false);
+const isTransactionsOpen = ref(false);
+
+const searchQuery = ref('');
+const searchResults = ref([]);
+const showSearchResults = ref(false);
+
+const availableRoutes = computed(() => {
+  return router.getRoutes().filter(route => route.meta && route.meta.title && route.meta.requiresAuth);
+});
+
+watch(searchQuery, (newQuery) => {
+  if (newQuery) {
+    searchResults.value = availableRoutes.value.filter(route => 
+      route.meta.title.toLowerCase().includes(newQuery.toLowerCase())
+    );
+  } else {
+    searchResults.value = [];
+  }
+});
+
+const navigateTo = (routeName) => {
+  router.push({ name: routeName });
+  searchQuery.value = '';
+  showSearchResults.value = false;
+};
 
 const toggleNotifications = () => {
   isNotificationsOpen.value = !isNotificationsOpen.value;
@@ -129,5 +190,10 @@ const formatCurrency = (value) => {
 onMounted(() => {
   const today = new Date().toISOString().split('T')[0];
   dashboardStore.fetchVoidCancel(today, today);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.relative')) {
+      showSearchResults.value = false;
+    }
+  });
 });
 </script>

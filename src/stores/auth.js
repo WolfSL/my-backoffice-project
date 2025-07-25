@@ -1,14 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import router from '@/router'; // Import the router to redirect after login
+import router from '@/router';
 import apiService from '@/services/apiService';
 
-// Define the authentication store
 export const useAuthStore = defineStore('auth', () => {
   // === STATE ===
-  const user = ref(null);
+  // MODIFIED: Initialize user state from localStorage
+  const user = ref(JSON.parse(localStorage.getItem('user')));
   const companyName = ref('');
-  const companyAddress = ref(''); // New state for company address
+  const companyAddress = ref('');
 
   // === GETTERS ===
   const isLoggedIn = computed(() => !!user.value);
@@ -27,6 +27,8 @@ export const useAuthStore = defineStore('auth', () => {
       const userData = response.data?.[0];
       if (userData && userData.Status === true) {
         user.value = userData;
+        // MODIFIED: Save user to localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
         await router.push('/');
       } else {
         throw new Error(userData ? 'User is not active.' : 'Invalid username or password.');
@@ -39,11 +41,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     user.value = null;
+    // MODIFIED: Remove user from localStorage
+    localStorage.removeItem('user');
     await router.push('/login');
   }
   
   async function fetchCompany() {
-    // Avoid re-fetching if data already exists
     if (companyName.value) return;
     try {
       const response = await apiService.getCompany();
@@ -54,7 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (error) {
       console.error('Failed to fetch company details:', error);
-      companyName.value = 'My Company'; // Set a fallback name on error
+      companyName.value = 'My Company';
       companyAddress.value = '';
     }
   }
@@ -63,7 +66,6 @@ export const useAuthStore = defineStore('auth', () => {
     return permissions.value.includes(requiredPermission);
   }
 
-  // Expose new state and action
   return {
     user,
     companyName,
