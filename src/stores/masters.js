@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import apiService from '@/services/apiService';
+import { useAuthStore } from '@/stores/auth';
 
 export const useMastersStore = defineStore('masters', () => {
     // === STATE ===
@@ -16,6 +17,7 @@ export const useMastersStore = defineStore('masters', () => {
     const currentItemPrices = ref([]);
     const transactionItems = ref([]); // MODIFIED: New state for BOM item search
     const currentItemBOM = ref([]); // MODIFIED: New state for current item's BOM
+    const supplierBankDetails = ref([]);
 
     const isLoading = ref(false);
     const isAdding = ref(false);
@@ -24,7 +26,13 @@ export const useMastersStore = defineStore('masters', () => {
     const successMessage = ref('');
     const operationError = ref('');
 
+
+    const itemOtherDetails = ref([]);
+    const isUploading = ref(false);
+
     // === ACTIONS ===
+
+
 
     function setSuccessMessage(message) {
         successMessage.value = message;
@@ -122,7 +130,8 @@ export const useMastersStore = defineStore('masters', () => {
     }
     async function fetchLocations() {
         if (locations.value.length > 0) return;
-        try { const response = await apiService.getLocations(); locations.value = response.data; }
+        console.log('Fetching locations for user:', useAuthStore().user);
+        try { const response = await apiService.getLocations(useAuthStore().user.LocationCode, useAuthStore().user.Username); locations.value = response.data; }
         catch (err) { console.error('Failed to fetch locations:', err); }
     }
     async function fetchPriceLevels(locationCode) {
@@ -156,52 +165,73 @@ export const useMastersStore = defineStore('masters', () => {
         }
     }
 
-    async function saveItemPrices(itemCode, prices, user) {
-        for (const price of prices) {
-            try {
-                const payload = {
-                    locationCodes: price.locationCode,
-                    ItemCode: itemCode,
-                    GroupCode: price.GroupCode || '001',
-                    PriceLevel: price.priceLevelCode,
-                    SellingPricesExTax: price.selling,
-                    SellingPricesinTax: price.mSelling,
-                    CreateUser: user
-                };
-                await apiService.savePrice(payload);
-            } catch (err) {
-                console.error(`Failed to save price for location ${price.locationCode}`, err);
-                setOperationError(`Failed to save price for ${price.locationName}.`);
-            }
-        }
+    // src/stores/masters.js
+
+// Add this new action inside your defineStore
+async function addAndSavePrices(itemCode, locationCodes, priceLevelCode, selling, mSelling) {
+    if (!locationCodes || locationCodes.length === 0 || !priceLevelCode) {
+        setOperationError("Please select at least one location and a price level.");
+        return;
     }
 
-    // MODIFIED: New Item Actions
-    async function fetchItems() {
-        isLoading.value = true;
-        error.value = null;
-        try {
-            const response = await apiService.getItems();
-            // Normalize the keys from the API response
-            items.value = response.data.map(item => ({
-                code: item['itemcode#150'],
-                description: item['item desc#220'],
-                pluType: item['PluType#150'],
-                department: item['Dep#150'],
-                subDepartment: item['Sub Dep#170'],
-                supplier: item['Supplier#200'],
-                uom: item['UOM#NF'],
-                volume: item['Vol#NF'],
-                cs: item['CS#NF'],
-                sc: item['S/C'],
-            }));
-        } catch (err) {
-            error.value = 'Failed to fetch items.';
-            console.error(err);
-        } finally {
-            isLoading.value = false;
-        }
+    isAdding.value = true;
+    operationError.value = null;
+
+    try {
+        // Find GroupCode from existing prices or default
+        const existingPrice = currentItemPrices.value.find(p => p.priceLevelCode === priceLevelCode);
+        const groupCode = existingPrice?.GroupCode || '001';
+
+        const payload = {
+            locationCodes: locationCodes.join(','),
+            itemCode: itemCode,
+            groupCode: groupCode,
+            priceLevel: priceLevelCode,
+            sellingExTax: selling,
+            sellingInTax: mSelling,
+            createUser: useAuthStore().user?.Username || 'admin'
+        };
+
+        await apiService.savePrice(payload);
+        setSuccessMessage('Price added successfully!');
+
+        // Refresh the price list to show the newly added price
+        await fetchItemPrices(itemCode, 'X');
+
+    } catch (error) {
+        setOperationError('Failed to add price.');
+        console.error('Failed to save item price:', error);
+    } finally {
+        isAdding.value = false;
     }
+}
+
+// MODIFIED: New Item Actions
+async function fetchItems() {
+    isLoading.value = true;
+    error.value = null;
+    try {
+        const response = await apiService.getItems();
+        // Normalize the keys from the API response
+        items.value = response.data.map(item => ({
+            code: item['itemcode#150'],
+            description: item['item desc#220'],
+            pluType: item['PluType#150'],
+            department: item['Dep#150'],
+            subDepartment: item['Sub Dep#170'],
+            supplier: item['Supplier#200'],
+            uom: item['UOM#NF'],
+            volume: item['Vol#NF'],
+            cs: item['CS#NF'],
+            sc: item['S/C'],
+        }));
+    } catch (err) {
+        error.value = 'Failed to fetch items.';
+        console.error(err);
+    } finally {
+        isLoading.value = false;
+    }
+}
     async function addItem(itemData, barcodes) {
         isAdding.value = true;
         operationError.value = null;
@@ -336,20 +366,86 @@ export const useMastersStore = defineStore('masters', () => {
         }
     }
 
+    async function fetchSupplierBankDetails(supplierCode) {
+        try {
+            const response = await apiService.getSupplierBankDetails(supplierCode);
+            supplierBankDetails.value = response.data;
+        } catch (error) {
+            setOperationError('Failed to fetch supplier bank details.');
+            supplierBankDetails.value = null;
+        }
+    }
+
+    const fetchItemMasterOther = async (itemCode) => {
+        try {
+            const response = await apiService.getItemMasterOther(itemCode);
+            if (response.data && response.data.length > 0) {
+                itemOtherDetails.value = response.data[0];
+            } else {
+                itemOtherDetails.value = { ItemCode: itemCode, Dec1: '', Dec2: '' };
+            }
+        } catch (error) {
+            console.error('Failed to fetch item other details:', error);
+            itemOtherDetails.value = { ItemCode: itemCode, Dec1: '', Dec2: '' };
+        }
+    };
+
+    async function saveItemMasterOther(itemCode, details) {
+        try {
+            const payload = {
+                itemCode: itemCode,
+                dec1: details.Dec1 || '',
+                dec2: details.Dec2 || ''
+            };
+            await apiService.updateItemOther(payload);
+            // No success message here to avoid duplication
+        } catch (error) {
+            this.setOperationError('Failed to save menu details.');
+            console.error('Failed to save item other details:', error);
+        }
+    };
+    function clearItemOtherDetails() {
+        itemOtherDetails.value = null;
+    };
+
+    // Add this new state property inside your defineStore, near the top
+
+
+// Add this new action to your store
+async function uploadItemImage(itemCode, file) {
+    isUploading.value = true;
+    operationError.value = null;
+    try {
+        const response = await apiService.uploadItemImage(itemCode, file);
+        if (itemOtherDetails.value && response.data.url) {
+            itemOtherDetails.value.Dec2 = response.data.url; // Update the URL from the API response
+        }
+        setSuccessMessage('Image uploaded successfully.');
+    } catch (error) {
+        setOperationError('Image upload failed.');
+        console.error('Image upload failed:', error);
+    } finally {
+        isUploading.value = false;
+    }
+}
+
+
+
     // MODIFIED: New getter for total BOM cost
     const totalBomCost = computed(() => {
         return currentItemBOM.value.reduce((total, item) => total + (item.totalCost || 0), 0);
     });
     return {
         suppliers, departments, subDepartments, items, units, printTypes, pluTypes, locations, priceLevels, currentItemPrices,
-        transactionItems, currentItemBOM,
+        transactionItems, currentItemBOM, supplierBankDetails, itemOtherDetails,
         isLoading, isAdding, isUpdating, error, successMessage, operationError,
         totalBomCost,
         fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
         fetchDepartments, addDepartment, updateDepartment, deleteDepartment,
         fetchSubDepartments, addSubDepartment, updateSubDepartment, deleteSubDepartment,
         fetchItems, addItem, fetchUnits, fetchPrintTypes, fetchPluTypes, fetchItemDetails,
-        updateItem, deleteItem, fetchLocations, fetchPriceLevels, fetchItemPrices, saveItemPrices,
-        fetchItemsForTransactions, fetchItemBOM, saveBomComponent, deleteBomComponent
+        updateItem, deleteItem, fetchLocations, fetchPriceLevels, fetchItemPrices, addAndSavePrices,
+        fetchItemsForTransactions, fetchItemBOM, saveBomComponent, deleteBomComponent, fetchSupplierBankDetails,
+        fetchItemMasterOther, saveItemMasterOther, clearItemOtherDetails, uploadItemImage
     };
 });

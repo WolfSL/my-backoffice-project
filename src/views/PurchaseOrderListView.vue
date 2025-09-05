@@ -114,7 +114,7 @@ const handleFilterChange = () => {
     }
     
     const type = filterType.value === 'draft' ? 'Draft' : 'Date';
-    poStore.fetchPurchaseOrders(type, 'HO', authStore.user.LocationCode, from, to);
+    poStore.fetchPurchaseOrders(type, authStore.user.Username, authStore.user.LocationCode, from, to);
 };
 
 const formatCurrency = (value) => {

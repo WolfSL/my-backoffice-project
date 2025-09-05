@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import apiService from '@/services/apiService';
+import { useAuthStore } from './auth';
+import { db } from '@/firebase/firebase';
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // === STATE ===
@@ -11,19 +13,29 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const hourlySalesData = ref([]);
   const selectedLocations = ref([]);
   const voidCancelData = ref([]); // MODIFIED: New state for notifications
-  
+  const channelWiseSales = ref([]);
+
   const isSalesSummaryLoading = ref(false);
   const isSupplierSalesLoading = ref(false);
   const isCusCountLoading = ref(false);
   const isCashFlowLoading = ref(false);
   const isHourlySalesLoading = ref(false);
   const isNotificationsLoading = ref(false); // MODIFIED: New loading state
-  
+
   const error = ref(null);
-  
+
+  const widgetConfig = ref([
+    { id: 'salesSummary', visible: true, name: 'Sales Summary' },
+    { id: 'supplierSales', visible: true, name: 'Supplier Sales' },
+    { id: 'channelSales', visible: true, name: 'Channel Sales' },
+    { id: 'hourlySales', visible: true, name: 'Hourly Sales' },
+    { id: 'cashFlow', visible: true, name: 'Cash Flow' },
+  ]);
+
   const xReportData = ref([]);
   const isXReportLoading = ref(false);
   const isXReportModalOpen = ref(false);
+  const isChannelWiseSalesLoading = ref(false);
 
   const aiForecast = ref('');
   const isForecastLoading = ref(false);
@@ -36,18 +48,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const totalSales = computed(() => {
     return salesSummary.value.reduce((total, item) => total + item.amt, 0);
   });
+  
 
   // MODIFIED: New getter to count total notifications
   const notificationCount = computed(() => voidCancelData.value.length);
 
   // === ACTIONS ===
-  
+
   async function fetchSalesSummary(dateFrom, dateTo) {
     isSalesSummaryLoading.value = true;
     try {
       const response = await apiService.getLiveSalesAll(dateFrom, dateTo);
       salesSummary.value = response.data;
-    } catch (err) { error.value = 'Failed to load Sales Summary.'; console.error(err); } 
+    } catch (err) { error.value = 'Failed to load Sales Summary.'; console.error(err); }
     finally { isSalesSummaryLoading.value = false; }
   }
 
@@ -70,7 +83,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (err) { error.value = 'Failed to load Customer Count.'; console.error(err); }
     finally { isCusCountLoading.value = false; }
   }
-  
+
   async function fetchHourlySales(dateFrom, dateTo) {
     isHourlySalesLoading.value = true;
     try {
@@ -112,7 +125,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
     const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const result = await response.json();
-    if (result.candidates && result.candidates.length > 0) { return result.candidates[0].content.parts[0].text; } 
+    if (result.candidates && result.candidates.length > 0) { return result.candidates[0].content.parts[0].text; }
     else { throw new Error("No content returned from AI."); }
   }
 
@@ -123,7 +136,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       const salesData = cashFlowData.value.map(d => ({ period: d.day || d.month, sales: d.flow }));
       const prompt = `Based on the following sales data for a business in Sri Lanka, provide a brief, one-paragraph sales forecast for the next period. Mention potential trends and be optimistic but realistic. consider holiday and seasons in sri lanka. Data: ${JSON.stringify(salesData)}`;
       aiForecast.value = await _callGeminiAPI(prompt);
-    } catch (error) { console.error("AI Forecast error:", error); aiForecast.value = "Sorry, the forecast could not be generated."; } 
+    } catch (error) { console.error("AI Forecast error:", error); aiForecast.value = "Sorry, the forecast could not be generated."; }
     finally { isForecastLoading.value = false; }
   }
 
@@ -133,7 +146,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       const prompt = `Analyze the following supplier sales data. Identify the top 2-3 performers and point out any potential risks, like over-reliance on one supplier or a supplier with very low sales. Be concise. Data: ${JSON.stringify(supplierSales.value)}`;
       supplierAnalysis.value = await _callGeminiAPI(prompt);
-    } catch (error) { console.error("AI Supplier Analysis error:", error); supplierAnalysis.value = "Sorry, the analysis could not be generated."; } 
+    } catch (error) { console.error("AI Supplier Analysis error:", error); supplierAnalysis.value = "Sorry, the analysis could not be generated."; }
     finally { isSupplierAnalysisLoading.value = false; }
   }
 
@@ -143,13 +156,26 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       const prompt = `Analyze the following hourly sales data which lists sales by day and hour. Identify the peak business hours and the quietest periods. Provide a one-paragraph summary with a suggestion for staffing. Data: ${JSON.stringify(hourlySalesData.value)}`;
       hourlyAnalysis.value = await _callGeminiAPI(prompt);
-    } catch (error) { console.error("AI Hourly Analysis error:", error); hourlyAnalysis.value = "Sorry, the analysis could not be generated."; } 
+    } catch (error) { console.error("AI Hourly Analysis error:", error); hourlyAnalysis.value = "Sorry, the analysis could not be generated."; }
     finally { isHourlyAnalysisLoading.value = false; }
+  }
+
+  async function fetchChannelWiseSales(dateFrom, dateTo) {
+    isChannelWiseSalesLoading.value = true;
+    try {
+      const response = await apiService.getChannelWiseSales(dateFrom, dateTo);
+      channelWiseSales.value = response.data;
+    } catch (err) {
+      error.value = 'Failed to fetch channel wise sales.';
+      console.error(err);
+    } finally {
+      isChannelWiseSalesLoading.value = false;
+    }
   }
 
   function toggleLocationSelection(locationCode) {
     const index = selectedLocations.value.indexOf(locationCode);
-    if (index === -1) { selectedLocations.value.push(locationCode); } 
+    if (index === -1) { selectedLocations.value.push(locationCode); }
     else { selectedLocations.value.splice(index, 1); }
   }
 
@@ -160,21 +186,40 @@ export const useDashboardStore = defineStore('dashboard', () => {
     try {
       const response = await apiService.getXreport(dateFrom, dateTo, locCode);
       xReportData.value = response.data;
-    } catch (err) { console.error('Failed to fetch X-Report:', err); } 
+    } catch (err) { console.error('Failed to fetch X-Report:', err); }
     finally { isXReportLoading.value = false; }
   }
 
-  function closeXReportModal() { isXReportModalOpen.value = false; }
+  async function fetchWidgetConfig() {
+    const authStore = useAuthStore();
+    if (!authStore.firebaseUser) return;
+    const companyId = authStore.companyName || 'default-company';
+    const docRef = db.collection('companies').doc(companyId).collection('users').doc(authStore.firebaseUser.uid);
+    const doc = await docRef.get();
+    if (doc.exists && doc.data().widgetConfig) {
+      widgetConfig.value = doc.data().widgetConfig;
+    }
+  }
+  async function saveWidgetConfig() {
+    const authStore = useAuthStore();
+    if (!authStore.firebaseUser) return;
+    const companyId = authStore.companyName || 'default-company';
+    const docRef = db.collection('companies').doc(companyId).collection('users').doc(authStore.firebaseUser.uid);
+    await docRef.set({ widgetConfig: widgetConfig.value }, { merge: true });
+  }
 
+  function closeXReportModal() { isXReportModalOpen.value = false; }
   return {
-    salesSummary, supplierSales, customerCount, cashFlowData, hourlySalesData, voidCancelData,
-    isSalesSummaryLoading, isSupplierSalesLoading, isCusCountLoading, isCashFlowLoading, isHourlySalesLoading, isNotificationsLoading,
+    salesSummary, supplierSales, customerCount, cashFlowData, hourlySalesData, voidCancelData, channelWiseSales, widgetConfig,
+    isSalesSummaryLoading, isSupplierSalesLoading, isCusCountLoading, isCashFlowLoading, isHourlySalesLoading, isNotificationsLoading, isChannelWiseSalesLoading,
     error, totalSales, selectedLocations, xReportData, isXReportLoading, isXReportModalOpen,
     aiForecast, isForecastLoading, supplierAnalysis, isSupplierAnalysisLoading, hourlyAnalysis, isHourlyAnalysisLoading,
     notificationCount,
     fetchSalesSummary, fetchSupplierSales, fetchCusCount, fetchHourlySales,
     fetchCashFlow, fetchVoidCancel,
     generateSalesForecast, generateSupplierAnalysis, generateHourlyAnalysis,
-    toggleLocationSelection, fetchXReport, closeXReportModal
+    toggleLocationSelection, fetchXReport, closeXReportModal,
+    fetchChannelWiseSales, fetchWidgetConfig, saveWidgetConfig
   };
+
 });

@@ -78,7 +78,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.department }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.subDepartment
-                  }}</td>
+                }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.supplier }}
                 </td>
                 <td
@@ -306,7 +306,7 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
                 <select v-model="bomLocation" class="mt-1 px-2 py-1 w-full">
                   <option v-for="loc in mastersStore.locations" :key="loc.locCode" :value="loc.locCode">{{ loc.locName
-                    }}</option>
+                  }}</option>
                 </select>
               </div>
               <div class="flex-1 min-w-[150px]">
@@ -384,6 +384,42 @@
               </div>
             </div>
           </div>
+          <!-- This goes next to the other v-if tab panels -->
+          <div v-if="activeTab === 'Menu'">
+            <div v-if="mastersStore.itemOtherDetails">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">About the Item</label>
+                <textarea v-model="mastersStore.itemOtherDetails.Dec1" rows="4"
+                  class="mt-1 w-full p-2 border rounded-md dark:bg-slate-700 dark:border-slate-600"></textarea>
+              </div>
+              <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Item Image URL</label>
+                <input v-model="mastersStore.itemOtherDetails.Dec2" type="text"
+                  class="mt-1 w-full px-2 py-1 dark:bg-slate-700 dark:border-slate-600">
+              </div>
+              <div class="mt-4">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Or Upload Image</label>
+              <div class="flex items-center space-x-4">
+                <input @change="onFileChange" :disabled="mastersStore.isUploading" type="file" accept="image/*"
+                  class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50" />
+                <!-- ADD THIS LOADING INDICATOR -->
+                <div v-if="mastersStore.isUploading" class="text-sm text-gray-500 dark:text-gray-400">
+                  Uploading...
+                </div>
+              </div>
+            </div>
+              <div class="mt-4" v-if="imagePreviewUrl || mastersStore.itemOtherDetails.Dec2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Image Preview</label>
+                <img :src="imagePreviewUrl || mastersStore.itemOtherDetails.Dec2" alt="Item Preview"
+                  class="mt-2 rounded-lg max-h-48">
+              </div>
+            </div>
+
+            <div v-else class="text-center py-10 text-gray-500 dark:text-gray-400">
+              Loading menu details...
+            </div>
+            
+          </div>
         </div>
       </div>
       <div
@@ -460,7 +496,7 @@
         <div class="mt-2">
           <p class="text-sm text-gray-500 dark:text-gray-400">Are you sure you want to delete this item?</p>
           <p v-if="itemToDelete" class="mt-2 font-semibold text-gray-700 dark:text-gray-300">{{ itemToDelete.description
-            }}</p>
+          }}</p>
         </div>
       </div>
       <div class="bg-gray-50 dark:bg-slate-900 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -490,12 +526,15 @@ const filterDepartment = ref('');
 const filterSubDepartment = ref('');
 const filterSupplier = ref('');
 
+const fileToUpload = ref(null);
+const imagePreviewUrl = ref('');
+
 const isModalOpen = ref(false);
 const isEditing = ref(false);
 const isDeleteModalOpen = ref(false);
 const itemToDelete = ref(null);
 const activeTab = ref('Details');
-const tabs = [{ name: 'Details' }, { name: 'Pricing' }, { name: 'BOM' }];
+const tabs = [{ name: 'Details' }, { name: 'Pricing' }, { name: 'BOM' }, { name: 'Menu' }];
 const validationErrors = ref({});
 
 const isLocationModalOpen = ref(false);
@@ -557,10 +596,13 @@ const openAddModal = () => {
   activeTab.value = 'Details';
   validationErrors.value = {};
   isModalOpen.value = true;
+  mastersStore.clearItemOtherDetails();
 };
 
 const openEditModal = async (item) => {
   const details = await mastersStore.fetchItemDetails(item.code);
+  await mastersStore.fetchItemMasterOther(item.code);
+
   await mastersStore.fetchItemPrices(item.code);
   if (details) {
     editableItem.value = {
@@ -666,7 +708,10 @@ const handleSaveItem = async () => {
     } else {
       await mastersStore.addItem(editableItem.value, editableItem.value.barcodes);
     }
-    await mastersStore.saveItemPrices(editableItem.value.itemCode, mastersStore.currentItemPrices, authStore.user.Username);
+    //await mastersStore.saveItemPrices(editableItem.value.itemCode, mastersStore.currentItemPrices, authStore.user.Username);
+    if (mastersStore.itemOtherDetails) {
+      await mastersStore.saveItemMasterOther(editableItem.value.itemCode, mastersStore.itemOtherDetails);
+    }
     isModalOpen.value = false;
   } catch (error) { /* Handled in store */ }
 };
@@ -678,21 +723,38 @@ const handleDeleteItem = async () => {
   itemToDelete.value = null;
 };
 
-const addPrice = () => {
-  if (selectedLocations.value.length === 0 || !selectedPriceLevel.value) {
-    mastersStore.setOperationError("Please select at least one location and a price level.");
+const onFileChange = async (event) => {
+  const file = event.target.files[0];
+  if (!editableItem.value.itemCode) {
+    mastersStore.setOperationError('Please save the new item before uploading an image.');
+    event.target.value = ''; // Clear the file input
     return;
   }
-  const priceLevel = mastersStore.priceLevels.find(pl => pl.PricelevelCode === selectedPriceLevel.value);
-  selectedLocations.value.forEach(locCode => {
-    const location = mastersStore.locations.find(l => l.locCode === locCode);
-    mastersStore.currentItemPrices.push({
-      locationCode: locCode, locationName: location?.locName || locCode,
-      priceLevelCode: selectedPriceLevel.value, priceLevelName: priceLevel?.PriceLevel || selectedPriceLevel.value,
-      selling: sellingPrice.value, mSelling: mSellingPrice.value
-    });
-  });
-  selectedLocations.value = []; selectedPriceLevel.value = ''; sellingPrice.value = 0; mSellingPrice.value = 0;
+  if (file) {
+    fileToUpload.value = file;
+    imagePreviewUrl.value = URL.createObjectURL(file);
+    await mastersStore.uploadItemImage(editableItem.value.itemCode, file);
+  }
+};
+
+// src/views/ItemsView.vue
+
+const addPrice = async () => {
+    await mastersStore.addAndSavePrices(
+        editableItem.value.itemCode,
+        selectedLocations.value,
+        selectedPriceLevel.value,
+        sellingPrice.value,
+        mSellingPrice.value
+    );
+
+    // If the save was successful, clear the input fields
+    if (!mastersStore.operationError) {
+        selectedLocations.value = [];
+        selectedPriceLevel.value = '';
+        sellingPrice.value = 0;
+        mSellingPrice.value = 0;
+    }
 };
 
 const removePrice = (index) => {

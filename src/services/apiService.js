@@ -14,10 +14,10 @@ export default {
 
   login(username, password) {
     const url = `/Acc/GetUserAsync?username=${username}&password=${encodeURIComponent(password)}`;
-    
+
     return apiClient.post(url, {});
   },
-  
+
   //Dashboard related API calls
   getCompany() {
     return apiClient.get('/Acc/GetCompany');
@@ -112,22 +112,32 @@ export default {
   deleteItem(itemCode) {
     return apiClient.post('/Item/deleteItem', { itemCode: itemCode });
   },
-  getLocations() {
-    return apiClient.get('/Master/getLocations');
+  getLocations(locationCode, userName) {
+    return apiClient.get('/Master/getLocations?userLocation=' + locationCode + '&userName=' + userName);
   },
 
   getPriceLevels(locationCode) {
     return apiClient.get(`/Item/getPlevels?location=${locationCode}`);
   },
 
-  getItemPrices(itemCode, locationCodes ) {
+  getItemPrices(itemCode, locationCodes) {
     return apiClient.get(`/Item/getPricing?item=${itemCode}&locationCodes=${locationCodes}`);
   },
+  getApiUsers: () => apiClient.get('/Acc/GetUsers'), 
 
-  savePrice(priceData) {
-    const { locationCodes, ItemCode, GroupCode, PriceLevel, SellingPricesExTax, SellingPricesinTax, CreateUser } = priceData;
-    const url = `/Item/SavePrice?locationCodes=${locationCodes}&ItemCode=${ItemCode}&GroupCode=${GroupCode}&PriceLevel=${PriceLevel}&SellingPricesExTax=${SellingPricesExTax}&SellingPricesinTax=${SellingPricesinTax}&CreateUser=${CreateUser}`;
-    return apiClient.post(url, {});
+  // src/services/apiService.js
+
+  savePrice(payload) {
+    const params = new URLSearchParams({
+      locationCodes: payload.locationCodes,
+      ItemCode: payload.itemCode,
+      GroupCode: payload.groupCode,
+      PriceLevel: payload.priceLevel,
+      SellingPricesExTax: payload.sellingExTax,
+      SellingPricesinTax: payload.sellingInTax,
+      CreateUser: payload.createUser
+    });
+    return apiClient.post(`/Item/SavePrice?${params.toString()}`);
   },
 
   // MODIFIED: Added new functions for BOM
@@ -151,6 +161,10 @@ export default {
     return apiClient.get(`/Report/getQB?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}&type=8`);
   },
 
+  getDailySales(dateFrom, dateTo, locations) {
+    return apiClient.get(`/Report/getQB?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}&type=0`);
+  },
+
   getSalesSummaryWithPayment(dateFrom, dateTo, locations) {
     return apiClient.get(`/Report/getSalesSummeryWithPayment?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}`);
   },
@@ -164,14 +178,14 @@ export default {
     console.log(API_BASE_URL + `/Grn/getSupDetails?loc=${loc}&sup=${sup}`);
     return apiClient.get(`/Grn/getSupDetails?loc=${loc}&sup=${sup}`);
   },
-  updateSupAgentDetails(loc, sup, agentName, agentEmail) {
+  updateSupAgentDetails(loc, sup, agentName, agentEmail, refCode) {
     console.log(API_BASE_URL + `/Grn/updateSupAgentDetails?loc=${loc}&sup=${sup}&agentName=${agentName}&agentEmail=${agentEmail}`);
-    return apiClient.get(`/Grn/updateSupAgentDetails?loc=${loc}&sup=${sup}&agentName=${agentName}&agentEmail=${agentEmail}`);
+    return apiClient.get(`/Grn/updateSupAgentDetails?loc=${loc}&sup=${sup}&agentName=${agentName}&agentEmail=${agentEmail}&refcode=${refCode}`);
   },
   reservePoNumber(username, discode, docType) {
     return apiClient.get(`/Grn/reserv?username=${username}&discode=${discode}&docType=${docType}`);
   },
-  savePO(payload,username) {
+  savePO(payload, username) {
     console.log(API_BASE_URL + `/Grn/save?username=${username}`);
     //log payload before making the request
     console.log("Payload for savePO:", payload);
@@ -189,5 +203,73 @@ export default {
       }
     });
   },
+  getSupplierBankDetails(supplierCode) {
+    // This is a placeholder. Replace with your actual API endpoint.
+    console.warn("API Endpoint for getSupplierBankDetails not implemented. Using hardcoded data.");
+    return Promise.resolve({
+      data: {
+        beneficiaryName: "Distilleries Company Of Sri Lanka PLC",
+        bankName: "Hatton National Bank - Head Office",
+        accountNo: "0030 2023 3243",
+        refCode: "78411"
+      }
+    });
+  },
+  getInvDetailReport(dateFrom, dateTo, locations) {
+    return apiClient.get(`/Report/getInvDetailReport?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}`);
+  },
+  // Add these functions to your apiService object
+  getItemMasterOther(itemCode) {
+    return apiClient.get(`/Item/getItemMasterOther?item=${itemCode}`);
+  },
+  updateItemOther(payload) {
+    return apiClient.post('/Item/update-item-other', payload);
+  },
+  uploadItemImage(itemCode, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    // This endpoint needs to be created on your backend
+    return apiClient.post(`/Item/uploadImage?itemCode=${itemCode}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+  getEmployees: () => apiClient.get('/TA/getJsonAuto'),
+  // Add these functions to your apiService object
+  getEmployeeDetails(eId, loc) {
+    return apiClient.get(`/TA/getEmp?eId=${eId}&loc=${loc}`);
+  },
+  getEmployeeCategories() {
+    return apiClient.get('/TA/getCat?act=true');
+  },
+  getEmployeeDepartments() {
+    return apiClient.get('/TA/getDep?act=true');
+  },
+  saveEmployee: (employeeData, type) => apiClient.post(`/TA/saveEmp?type=${type}`, employeeData),
+  getAttendanceReport: (loc, fDate, tDate) => apiClient.get(`/TA/getAllRecords?loc=${loc}&fDate=${fDate}&tDate=${tDate}&customDate=1`),
 
+  //GRN
+  getGrnList: () => apiClient.get('/TGrn'),
+  getGrnById: (tNo, loc) => apiClient.get(`/TGrn/${tNo}?loc=${loc}`),
+  saveGrn: (grnData) => apiClient.post('/TGrn', grnData),
+  deleteGrn: (tNo, loc) => apiClient.delete(`/TGrn/${tNo}?loc=${loc}`),
+
+  //Stock Take
+  initStock: (loc) => apiClient.get(`/Stock/initStock?loc=${loc}`),
+  getStockTake: (loc, date) => apiClient.get(`/Stock/getTake?loc=${loc}&date=${date}`),
+  saveStockTake: (itemcode, loc, count, date, type) => apiClient.get(`/Stock/saveTake?itemcode=${itemcode}&loc=${loc}&count=${count}&date=${date}&type=${type}`),
+  searchItemsForStockTake: (discode, filter) => apiClient.get(`/Master/getItem?discode=${discode}&filter=${filter}&stock=main`),
+  getItemByBarcodeForStockTake: (barcode, locCode) => apiClient.get(`/Stock/getItemByBarcode?barcode=${barcode}&locCode=${locCode}`),
+  saveStockTake: (itemcode, loc, count, date, type) => apiClient.get(`/Stock/saveTake?itemcode=${itemcode}&loc=${loc}&count=${count}&date=${date}&type=${type}`),
+  // Add this new function to your apiService object
+  uploadQbStockJson(payload) {
+    return apiClient.post('/Stock/uploadQbStockJson', payload);
+  },
+  getStockTakeReport: (loc, date, type) => apiClient.get(`/Stock/stockTakeReport?loc=${loc}&date=${date}&type=${type}`),
+  getChannelWiseSales: (dateFrom, dateTo) => apiClient.get(`/Report/getChannelWiseSales?dateFrom=${dateFrom}&dateTo=${dateTo}`),
+  getIncentiveReport: (dateFrom, dateTo, locations) => apiClient.get(`/Report/getIncentiveReport?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}`),
+  getVoidCancelReport(dateFrom, dateTo, locations) {
+    return apiClient.get(`/Report/getQB?dateFrom=${dateFrom}&dateTo=${dateTo}&locations=${locations}&type=13`);
+},
 };

@@ -3,6 +3,9 @@
     
     <!-- Main Login Card -->
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6 z-10">
+      <div class="flex justify-center mb-3">
+          <img src="/pwa-512x512.png" alt="Logo" class="h-24 w-24">
+        </div>
       <div class="text-center">
         <h1 class="text-3xl font-bold text-gray-800">{{ companyName || 'Sign In' }}</h1>
         <p class="text-gray-500 mt-2">Access your backoffice dashboard</p>

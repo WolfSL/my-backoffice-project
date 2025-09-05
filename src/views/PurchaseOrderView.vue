@@ -29,6 +29,10 @@
               <span :class="statusColorClass" class="px-3 py-1 text-xs font-bold text-white rounded-full">
                 {{ poStatus }}
               </span>
+              <span v-if="poStore.activePO.emailSent"
+                class="px-3 py-1 text-xs font-bold text-white rounded-full bg-cyan-500 ml-1">
+                Emailed
+              </span>
               <span v-if="poStore.activePO.processedUser" class="text-xs text-gray-500 dark:text-gray-400 ml-4">
                 Processed by {{ poStore.activePO.processedUser }} on {{ new
                   Date(poStore.activePO.processedDate).toLocaleDateString() }}
@@ -37,8 +41,10 @@
           </div>
           <div class="flex items-center space-x-2">
             <!-- MODIFIED: Added Print Button -->
-             <button v-if="isEditing && poStore.supplierDetails?.supAgentMail" @click="handleEmailPO" :disabled="poStore.isSubmitting"
-              class="p-2 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50">
+            <button v-if="isEditing" @click="handleEmailPO"
+              :disabled="poStore.isSubmitting || poStore.activePO.status !== 'P' || poStore.activePO.emailSent"
+              :title="emailButtonTitle"
+              class="p-2 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                 <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
@@ -52,8 +58,29 @@
                   clip-rule="evenodd" />
               </svg>
             </button>
+            <div class="relative">
+              <button @click="isCustomMenuOpen = !isCustomMenuOpen"
+                class="p-2 bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd"
+                    d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.532 1.532 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                    clip-rule="evenodd" />
+                </svg>
+              </button>
+              <div v-if="isCustomMenuOpen" @click="isCustomMenuOpen = false" class="fixed inset-0 h-full w-full z-10">
+              </div>
+              <div v-if="isCustomMenuOpen"
+                class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-700 rounded-md shadow-lg py-1 z-20">
+                <a href="#" @click.prevent="handlePrintCeft"
+                  class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600">Print
+                  CEFT Transfer</a>
+                <a href="#" @click.prevent="handleAiFill"
+                  class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600">Auto-fill
+                  Order Values by AI</a>
+              </div>
+            </div>
             <router-link to="/transactions/purchase-orders"
-              class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
+              class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700">
               Back to List
             </router-link>
           </div>
@@ -61,7 +88,7 @@
 
         <!-- PO Details Form -->
         <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-lg">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-slate-700 pb-6 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 border-b dark:border-slate-700 pb-6 mb-1">
             <!-- Supplier -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Supplier</label>
@@ -73,11 +100,10 @@
             <!-- Location -->
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
-              <select v-model="poStore.activePO.discode" :disabled="isProcessed"
-                class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-slate-900">
-                <option v-for="loc in mastersStore.locations" :key="loc.locCode" :value="loc.locCode">{{ loc.locName }}
-                </option>
-              </select>
+              <button @click="isLocationModalOpen = true" :disabled="isProcessed"
+                class="mt-1 w-full text-left px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white dark:bg-slate-700 dark:border-slate-600 disabled:bg-gray-100 dark:disabled:bg-slate-900">
+                {{ selectedLocationName || 'Select a location...' }}
+              </button>
             </div>
             <!-- PO Number -->
             <div>
@@ -106,40 +132,65 @@
           </div>
 
           <!-- Supplier Agent Details -->
-          <div v-if="poStore.supplierDetails" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Supplier Agent</label>
-              <input v-model="poStore.supplierDetails.supName" :disabled="isProcessed" type="text"
-                class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-slate-900">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Agent Email</label>
-              <input v-model="poStore.supplierDetails.supAgentMail" :disabled="isProcessed" type="email"
-                class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-slate-900">
-            </div>
-            <div class="self-end">
-              <button @click="handleUpdateAgent" :disabled="isProcessed"
-                class="w-full px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-teal-400">Save
-                Agent Info</button>
+          <div v-if="poStore.supplierDetails">
+            <button @click="isAgentInfoVisible = !isAgentInfoVisible"
+              class="flex justify-between items-center w-full text-left py-2">
+              <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Supplier Contact Details</h3>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 transition-transform"
+                :class="{ 'rotate-180': isAgentInfoVisible }" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clip-rule="evenodd" />
+              </svg>
+            </button>
+            <div v-if="isAgentInfoVisible" class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Supplier Agent</label>
+                <input v-model="poStore.supplierDetails.supName" :disabled="isProcessed" type="text"
+                  class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-slate-900">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Agent Email</label>
+                <input v-model="poStore.supplierDetails.supAgentMail" :disabled="isProcessed" type="email"
+                  class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-slate-900">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference Code</label>
+                <input :value="poStore.supplierDetails?.RefCode || ''" readonly type="text"
+                  class="mt-1 w-full px-2 py-1.5 bg-gray-100 dark:bg-slate-900 dark:border-slate-700">
+              </div>
+              <div class="self-end">
+                <button @click="handleUpdateAgent" :disabled="isProcessed"
+                  class="w-full px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-teal-400">Save
+                  Agent Info</button>
+              </div>
             </div>
           </div>
 
           <!-- PO Item Details Section -->
           <div class="mt-6">
             <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-200">PO Items</h2>
-              <button @click="isItemSelectorOpen = true" :disabled="isProcessed"
-                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-green-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd"
-                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                    clip-rule="evenodd" />
-                </svg>
-                Add Item
-              </button>
-            </div>
+    <h2 class="text-xl font-semibold text-gray-700 dark:text-gray-200">PO Items</h2>
+    <div class="flex rounded-md shadow-sm">
+        <button @click="hideZeroQtyItems = !hideZeroQtyItems"
+            class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            :class="hideZeroQtyItems ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50' : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-600'">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-1 1H9a1 1 0 01-1-1v-3.586L3.293 6.707A1 1 0 013 6V3z" clip-rule="evenodd" />
+            </svg>
+            <span class="ml-2">Hide Zero Qty</span>
+        </button>
+        <button @click="isItemSelectorOpen = true" :disabled="isProcessed"
+            class="-ml-px relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 bg-green-600 text-white text-sm font-medium hover:bg-green-700 focus:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-green-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            <span>Add Item</span>
+        </button>
+    </div>
+</div>
             <div class="space-y-4">
-              <div v-for="(item, index) in poStore.activePO.grnPrnDets" :key="item.serial"
+              <div v-for="(item, index) in filteredPoItems" :key="item.serial" 
                 class="bg-gray-50 dark:bg-slate-700/50 p-4 rounded-lg shadow-sm">
                 <div class="flex flex-wrap items-start justify-between">
                   <div class="flex-grow pr-8">
@@ -257,13 +308,19 @@
               class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-400">
               {{ poStore.isSubmitting ? 'Saving...' : (isEditing ? 'Update Draft' : 'Save as Draft') }}
             </button>
-            <button v-if="isEditing && poStore.activePO.status === 'D'" @click="poStore.approvePurchaseOrder()"
-              :disabled="poStore.isSubmitting"
+            <button
+              v-if="isEditing && poStore.activePO.status !== 'P' && poStore.activePO.status !== 'V' && authStore.hasPermission('PO#AP')"
+              @click="poStore.voidPurchaseOrder()" :disabled="poStore.isSubmitting"
+              class="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-red-400">
+              {{ poStore.isSubmitting ? 'Voiding...' : 'Void' }}
+            </button>
+            <button v-if="isEditing && poStore.activePO.status === 'D' && authStore.hasPermission('PO#AP')"
+              @click="poStore.approvePurchaseOrder()" :disabled="poStore.isSubmitting"
               class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-400">
               {{ poStore.isSubmitting ? 'Approving...' : 'Approve' }}
             </button>
-            <button v-if="isEditing && poStore.activePO.status === 'A'" @click="poStore.processPurchaseOrder()"
-              :disabled="poStore.isSubmitting"
+            <button v-if="isEditing && poStore.activePO.status === 'A' && authStore.hasPermission('PO#PRO')"
+              @click="poStore.processPurchaseOrder()" :disabled="poStore.isSubmitting"
               class="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-purple-400">
               {{ poStore.isSubmitting ? 'Processing...' : 'Process' }}
             </button>
@@ -273,7 +330,8 @@
     </div>
   </MainLayout>
 
-  <div v-if="isSupplierModalOpen" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+  <div v-if="isSupplierModalOpen"
+    class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] flex flex-col">
       <div class="p-5 border-b dark:border-slate-700">
         <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200">Select Supplier</h2>
@@ -290,7 +348,8 @@
         </ul>
       </div>
       <div class="p-4 bg-gray-50 dark:bg-slate-900 border-t dark:border-slate-700 text-right">
-        <button @click="isSupplierModalOpen = false" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Close</button>
+        <button @click="isSupplierModalOpen = false"
+          class="px-4 py-2 bg-indigo-600 text-white rounded-md">Close</button>
       </div>
     </div>
   </div>
@@ -313,7 +372,62 @@
         </ul>
       </div>
       <div class="p-4 bg-gray-50 dark:bg-slate-900 border-t dark:border-slate-700 text-right">
-        <button @click="isItemSelectorOpen = false"
+        <button @click="isItemSelectorOpen = false" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="isCeftModalOpen" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+      <div class="p-5 border-b dark:border-slate-700">
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200">CEFT Transfer Details</h2>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
+          <input v-model.number="ceftDetails.amount" type="number"
+            class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Value Date</label>
+          <input v-model="ceftDetails.date" type="date"
+            class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600">
+        </div>
+        <!-- MODIFIED: Added Reference Code field -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference Code</label>
+          <input v-model="ceftDetails.refCode" type="text"
+            class="mt-1 w-full px-2 py-1.5 dark:bg-slate-700 dark:border-slate-600">
+        </div>
+      </div>
+      <div
+        class="p-4 bg-gray-50 dark:bg-slate-900 border-t dark:border-slate-700 text-right flex justify-between items-center">
+        <button @click="isCeftModalOpen = false" class="px-4 py-2 bg-gray-600 text-white rounded-md">Cancel</button>
+        <button @click="generateCeftPdf" class="px-4 py-2 bg-indigo-600 text-white rounded-md">Print CEFT PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Locations Modal -->
+  <div v-if="isLocationModalOpen"
+    class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] flex flex-col">
+      <div class="p-5 border-b dark:border-slate-700">
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200">Select Location</h2>
+        <input v-model="locationSearch" type="text" placeholder="Search locations..."
+          class="w-full mt-4 px-2 py-1 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300">
+      </div>
+      <div class="p-6 overflow-y-auto">
+        <ul>
+          <li v-for="loc in filteredLocations" :key="loc.locCode" @click="selectLocation(loc)"
+            class="py-2 border-b dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+            <p class="text-sm font-medium text-gray-900 dark:text-gray-200">{{ loc.locName }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ loc.master }}</p>
+          </li>
+        </ul>
+      </div>
+      <div class="p-4 bg-gray-50 dark:bg-slate-900 border-t dark:border-slate-700 text-right">
+        <button @click="isLocationModalOpen = false"
           class="px-4 py-2 bg-indigo-600 text-white rounded-md">Close</button>
       </div>
     </div>
@@ -334,15 +448,48 @@ const poStore = usePoStore();
 const mastersStore = useMastersStore();
 const authStore = useAuthStore();
 
+
 const isSupplierModalOpen = ref(false);
 const supplierSearch = ref('');
 const isItemSelectorOpen = ref(false);
 const itemSearchText = ref('');
 const expandedItemSerial = ref(null);
 const qtyInputs = ref([]);
+const isCustomMenuOpen = ref(false);
+const isCeftModalOpen = ref(false);
+const isLocationModalOpen = ref(false);
+const locationSearch = ref('');
 
 const isEditing = computed(() => !!route.params.poNo);
 const isProcessed = computed(() => poStore.activePO?.status === 'P');
+const isAgentInfoVisible = ref(false);
+
+const ceftDetails = ref({
+  amount: 0,
+  date: new Date().toISOString().substring(0, 10),
+  refCode: '', // MODIFIED: Added refCode property
+});
+
+const selectedLocationName = computed(() => {
+  if (!poStore.activePO?.discode) return '';
+  const location = mastersStore.locations.find(l => l.locCode === poStore.activePO.discode);
+  return location?.locName || '';
+});
+
+const filteredLocations = computed(() => {
+  if (!locationSearch.value) return mastersStore.locations;
+  return mastersStore.locations.filter(l =>
+    l.locName.toLowerCase().includes(locationSearch.value.toLowerCase()) ||
+    l.master.toLowerCase().includes(locationSearch.value.toLowerCase())
+  );
+});
+
+const selectLocation = (location) => {
+  if (poStore.activePO) {
+    poStore.activePO.discode = location.locCode;
+  }
+  isLocationModalOpen.value = false;
+};
 
 const poStatus = computed(() => {
   if (!poStore.activePO) return '';
@@ -350,6 +497,7 @@ const poStatus = computed(() => {
     case 'D': return 'Draft';
     case 'A': return 'Approved';
     case 'P': return 'Processed';
+    case 'V': return 'Voided';
     default: return 'Unknown';
   }
 });
@@ -360,6 +508,7 @@ const statusColorClass = computed(() => {
     case 'D': return 'bg-yellow-500';
     case 'A': return 'bg-blue-500';
     case 'P': return 'bg-green-500';
+    case 'V': return 'bg-red-500';
     default: return 'bg-gray-500';
   }
 });
@@ -463,10 +612,100 @@ const handleUpdateAgent = () => {
       poStore.activePO.discode,
       poStore.activePO.supCode,
       poStore.supplierDetails.supName,
-      poStore.supplierDetails.supAgentMail
+      poStore.supplierDetails.supAgentMail,
+      poStore.supplierDetails.RefCode
     );
   }
 };
+
+const handlePrintCeft = async () => {
+  if (!poStore.activePO?.supCode) {
+    alert("Please select a supplier first.");
+    return;
+  }
+  const selectedSupplier = mastersStore.suppliers.find(s => s.id === poStore.activePO.supCode);
+  await mastersStore.fetchSupplierBankDetails(poStore.activePO.supCode);
+
+  ceftDetails.value.amount = totalPoAmount.value;
+  // MODIFIED: Get RefCode from the selected supplier
+  ceftDetails.value.refCode = poStore.supplierDetails.RefCode || '';
+
+  isCeftModalOpen.value = true;
+  isCustomMenuOpen.value = false;
+};
+
+const generateCeftPdf = () => {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const po = poStore.activePO;
+  const location = mastersStore.locations.find(l => l.locCode === po.discode);
+  const supplierBank = mastersStore.supplierBankDetails;
+
+  // --- Header ---
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(location?.comname || 'Company Name', 14, 20);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  if (location?.PvNo) doc.text(`(PV ${location.PvNo})`, 14, 25);
+  const address = location?.Address?.split('\r\n').map(l => l.trim()) || ['Company Address'];
+  doc.text(address, 14, 30);
+
+  // --- Bank Details ---
+  let y = 50;
+  const date = new Date(ceftDetails.value.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  doc.text(date, 14, y);
+  y += 10;
+  doc.text("The Manager", 14, y); y += 5;
+  doc.text(location?.BankName || "Your Bank Name", 14, y); y += 5;
+  doc.text(location?.BankAddress || "Your Bank Address", 14, y);
+
+  // --- Title ---
+  y += 15;
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CEFT TRANSFER', doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
+
+  // --- Transaction Details Table ---
+  y += 10;
+  const amountInWords = numberToWords.toWords(ceftDetails.value.amount);
+  const body = [
+    ["Ordering Customer's Name", ":-", location?.master || ''],
+    ["Address", ":-", address.join(', ')],
+    ["Account No.", ":-", location?.BankAcc || ''],
+    ["Amount in figures", ":-", `Rs. ${ceftDetails.value.amount.toFixed(2)}`],
+    ["Amount in words", ":-", `${amountInWords.charAt(0).toUpperCase() + amountInWords.slice(1)} Only.`],
+    ["Value Date", ":-", date],
+    ["Purpose/details of transaction", ":-", "Payment for Purchase"],
+  ];
+  doc.autoTable({
+    startY: y,
+    body: body,
+    theme: 'plain',
+    styles: { fontSize: 10 },
+    columnStyles: { 1: { cellWidth: 5 }, 2: { cellWidth: 'auto' } },
+  });
+
+  // --- Beneficiary Details Table ---
+  y = doc.lastAutoTable.finalY + 10;
+  const beneficiaryBody = [
+    ["Beneficiary's Name", ":-", supplierBank?.beneficiaryName || selectedSupplierName.value],
+    ["Bank & Branch Name", ":-", supplierBank?.bankName || ''],
+    ["Account No.", ":-", supplierBank?.accountNo || ''],
+    ["Reference Code", ":-", ceftDetails.value.refCode ? `${ceftDetails.value.refCode} (Please mention the reference code)` : ''],
+  ];
+  doc.autoTable({
+    startY: y,
+    body: beneficiaryBody,
+    theme: 'plain',
+    styles: { fontSize: 10 },
+    columnStyles: { 1: { cellWidth: 5 }, 2: { cellWidth: 'auto' } },
+  });
+
+  isCeftModalOpen.value = false;
+  doc.save(`CEFT_Transfer_PO_${po.grnNo}.pdf`);
+};
+
 
 
 
@@ -488,8 +727,8 @@ const generatePoPdfDocument = () => {
   const printWithAmount = window.config?.PO_PRINT_TYPE === 'with_amount';
   const selectedLocation = mastersStore.locations.find(l => l.locCode === po.discode);
 
-  const headerName = (selectedLocation?.master || authStore.companyName || 'Your Company').toString();
-  const headerAddressRaw = selectedLocation?.Address || authStore.companyAddress || '';
+  const headerName = (selectedLocation?.comname || authStore.companyName || 'Your Company').toString();
+  const headerAddressRaw = selectedLocation?.address || authStore.companyAddress || '';
   const headerAddress = (typeof headerAddressRaw === 'string') ? headerAddressRaw : '';
 
   doc.setFontSize(14);
@@ -499,11 +738,11 @@ const generatePoPdfDocument = () => {
   doc.setFont('helvetica', 'normal');
   const addressLines = headerAddress.split('\r\n').map(line => line.trim());
   doc.text(addressLines, 14, 26);
-  
+
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text('PURCHASE ORDER', doc.internal.pageSize.getWidth() / 2, 40, { align: 'center' });
-  
+
   doc.setFontSize(10);
   doc.text(`#${po.grnNo}`, 196, 20, { align: 'right' });
   doc.text(po.grnDate, 196, 26, { align: 'right' });
@@ -513,7 +752,7 @@ const generatePoPdfDocument = () => {
   doc.text('Supplier:', 14, y);
   doc.setFont('helvetica', 'normal');
   doc.text(selectedSupplierName.value, 35, y);
-  
+
   doc.setFont('helvetica', 'bold');
   doc.text('Supplier Email:', 14, y + 6);
   doc.setFont('helvetica', 'normal');
@@ -554,7 +793,7 @@ const generatePoPdfDocument = () => {
   if (printWithAmount) {
     footerRow[0].push('', formatCurrency(filteredAmount, false));
   }
-   
+
   doc.autoTable({
     startY: y,
     head: [headers],
@@ -562,7 +801,7 @@ const generatePoPdfDocument = () => {
     foot: footerRow,
     theme: 'grid',
     headStyles: { fillColor: [220, 220, 220], textColor: 20 },
-    footStyles: { fontStyle: 'bold', halign: 'right' },
+    footStyles: { fontStyle: 'bold', halign: 'right', fillColor: [230, 230, 230], textColor: 20 },
     styles: { fontSize: 8 },
     columnStyles: {
       3: { halign: 'right' },
@@ -575,7 +814,7 @@ const generatePoPdfDocument = () => {
   const footerY = doc.internal.pageSize.getHeight() - 30;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  
+
   doc.text(`Prepared by: ${po.createUser || 'N/A'}`, 14, footerY);
 
   if (po.status === 'A' || po.status === 'P') {
@@ -583,13 +822,13 @@ const generatePoPdfDocument = () => {
     const approvedDate = po.updatedate ? ` on ${formatDate(po.updatedate)}` : '';
     doc.text(approvedText + approvedDate, 75, footerY);
   }
-  
+
   if (po.status === 'P') {
     const processedText = `Processed by: ${po.processedUser || 'N/A'}`;
     const processedDate = po.processedDate ? ` on ${formatDate(po.processedDate)}` : '';
     doc.text(processedText + processedDate, 140, footerY);
   }
-  
+
   const finalY = doc.internal.pageSize.getHeight() - 15;
   doc.setFontSize(8);
   doc.setTextColor(150);
@@ -600,15 +839,37 @@ const generatePoPdfDocument = () => {
 };
 
 const handlePrintPO = () => {
-    const doc = generatePoPdfDocument();
-    doc.save(`PO_${poStore.activePO.grnNo}.pdf`);
+  const doc = generatePoPdfDocument();
+  doc.save(`PO_${poStore.activePO.grnNo}.pdf`);
 };
 
+const emailButtonTitle = computed(() => {
+  if (poStore.activePO.status !== 'P') {
+    return 'PO must be Processed to be emailed.';
+  }
+  if (poStore.activePO.emailSent) {
+    return 'This PO has already been emailed.';
+  }
+  return 'Email PO to Supplier';
+});
+
 const handleEmailPO = () => {
-    const doc = generatePoPdfDocument();
-    const pdfBlob = doc.output('blob');
-    poStore.emailPurchaseOrder(pdfBlob);
+  const doc = generatePoPdfDocument();
+  const pdfBlob = doc.output('blob');
+  poStore.emailPurchaseOrder(pdfBlob);
 };
+
+const hideZeroQtyItems = ref(false);
+
+const filteredPoItems = computed(() => {
+  if (!poStore.activePO || !poStore.activePO.grnPrnDets) {
+    return [];
+  }
+  if (hideZeroQtyItems.value) {
+    return poStore.activePO.grnPrnDets.filter(item => item.itQty > 0);
+  }
+  return poStore.activePO.grnPrnDets;
+});
 
 watch(
   () => [poStore.activePO?.supCode, poStore.activePO?.discode],
